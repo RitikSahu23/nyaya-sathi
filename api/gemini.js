@@ -1,4 +1,6 @@
-// HuggingFace Inference API backend for NyayaSathi
+// Ollama API backend for NyayaSathi
+// For local development: Install Ollama, run: ollama pull mistral
+// Then: ollama serve (keeps running in background)
 
 const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
 
@@ -29,9 +31,6 @@ RESPONSE FORMAT:
 ## General Next Steps
 [Numbered list of what people generally do]
 
-## Sources
-[Reference sources]
-
 ## Disclaimer
 This is general legal information only - not legal advice. Please consult a licensed advocate or approach your nearest District Legal Services Authority (DLSA) for free legal aid.`;
 
@@ -51,17 +50,6 @@ export default async (req, res) => {
   }
 
   try {
-    // Check API token
-    const HF_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
-    if (!HF_TOKEN) {
-      console.error('HUGGINGFACE_API_TOKEN environment variable is not set');
-      return res.status(500).json({ 
-        error: 'Server misconfigured',
-        message: 'HUGGINGFACE_API_TOKEN is missing. Please set it in Vercel environment variables.'
-      });
-    }
-
-    // Get request body
     const { userMessage, chatHistory, language, selectedState } = req.body;
 
     if (!userMessage || typeof userMessage !== 'string') {
@@ -79,166 +67,94 @@ export default async (req, res) => {
 
     const finalMessage = userMessage + languageHint + stateHint;
 
-    // Build conversation history for HuggingFace
-    let messages = [];
+    // Build conversation history
+    let conversationText = SYSTEM_PROMPT + '\n\n---\n\n';
     
-    // Add system message
-    messages.push({
-      role: 'system',
-      content: SYSTEM_PROMPT
-    });
-
-    // Add chat history
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {
       for (const msg of chatHistory) {
-        if (msg.role === 'user') {
-          messages.push({
-            role: 'user',
-            content: msg.parts?.[0]?.text || msg.content || ''
-          });
-        } else if (msg.role === 'model' || msg.role === 'assistant') {
-          messages.push({
-            role: 'assistant',
-            content: msg.parts?.[0]?.text || msg.content || ''
-          });
+        const role = msg.role === 'model' ? 'Assistant' : 'User';
+        const content = msg.parts?.[0]?.text || msg.content || '';
+        if (content) {
+          conversationText += `${role}: ${content}\n\n`;
         }
       }
     }
 
-    // Add current message
-    messages.push({
-      role: 'user',
-      content: finalMessage
-    });
+    conversationText += `User: ${finalMessage}\n\nAssistant: `;
 
-    // Call HuggingFace Inference API
-    // Using google/flan-t5-large (proven stable model on free tier)
-    console.log('Sending request to HuggingFace with token:', HF_TOKEN ? 'SET' : 'NOT SET');
+    console.log('Sending request to Ollama...');
     
-    // Format messages for HuggingFace text generation
-    let conversationText = '';
-    for (const msg of messages) {
-      if (msg.role === 'system') {
-        conversationText += msg.content + '\n\n';
-      } else if (msg.role === 'user') {
-        conversationText += msg.content + '\n\n';
-      } else if (msg.role === 'assistant') {
-        conversationText += msg.content + '\n\n';
-      }
-    }
+    // Try Ollama first (local development)
+    const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/generate';
     
-    console.log('Request text length:', conversationText.length);
-    
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/google/flan-t5-large',
-      {
+    try {
+      const response = await fetch(ollamaUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${HF_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: conversationText,
-          parameters: {
-            max_length: 512,
-            do_sample: true,
-            temperature: 0.7,
-          },
+          model: 'mistral',
+          prompt: conversationText,
+          stream: false,
+          temperature: 0.4,
         }),
-      }
-    );
-
-    // Get response text for logging
-    const responseText = await response.text();
-    console.log('HuggingFace Response Status:', response.status);
-    console.log('HuggingFace Response Body:', responseText.substring(0, 200));
-
-    if (!response.ok) {
-      let errorData = {};
-      try {
-        errorData = JSON.parse(responseText);
-      } catch {
-        errorData = { raw: responseText };
-      }
-      
-      console.error('HuggingFace API Error Details:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorData
       });
-      
-      // Check if token is missing
-      if (response.status === 401) {
-        return res.status(500).json({
-          error: 'API Authentication Failed',
-          message: 'HUGGINGFACE_API_TOKEN is invalid or expired. Please update it in Vercel Environment Variables.'
-        });
+
+      if (!response.ok) {
+        throw new Error(`Ollama error: ${response.status}`);
       }
+
+      const data = await response.json();
       
-      // Check if model is loading
-      if (response.status === 503) {
-        return res.status(503).json({
-          error: 'Model Loading',
-          message: 'The AI model is currently loading. Please try again in 30 seconds.'
-        });
+      if (!data.response) {
+        throw new Error('No response from Ollama');
       }
+
+      return res.status(200).json({
+        success: true,
+        response: data.response.trim(),
+      });
+
+    } catch (ollamaError) {
+      console.error('Ollama Error:', ollamaError.message);
       
-      return res.status(response.status).json({
-        error: 'Failed to get response from HuggingFace API',
-        status: response.status,
-        details: errorData.error?.message || errorData.error || response.statusText,
+      // Fallback: Return demo response
+      console.log('Ollama not available. Using demo mode.');
+      
+      const demoResponse = `## Your Question: ${userMessage.substring(0, 50)}...
+
+## Relevant Indian Laws
+- Indian Penal Code (IPC)
+- Consumer Protection Act, 2019
+- Constitution of India
+- State-specific laws (${selectedState || 'Your State'})
+
+## Simple Explanation
+This is a demo response. To get real AI responses:
+
+**For Development:** Install and run Ollama locally
+- Download: https://ollama.ai
+- Run: \`ollama pull mistral\` then \`ollama serve\`
+- The app will automatically connect to your local Ollama
+
+**General Legal Info:** Consult DLSA or Bar Council
+
+## Disclaimer
+This is general legal information only - not legal advice. For proper legal guidance, consult a licensed advocate or your nearest District Legal Services Authority (DLSA).`;
+
+      return res.status(200).json({
+        success: true,
+        response: demoResponse,
       });
     }
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Failed to parse HuggingFace response:', e);
-      throw new Error('Invalid JSON response from HuggingFace API');
-    }
-    
-    console.log('Response data type:', typeof data, 'Is array:', Array.isArray(data));
-    console.log('Response data sample:', JSON.stringify(data).substring(0, 300));
-    
-    // Handle different response formats
-    let responseMessage = '';
-    if (Array.isArray(data) && data.length > 0) {
-      // Array format: [{ generated_text: "..." }]
-      responseMessage = data[0].generated_text || data[0].text || JSON.stringify(data[0]);
-    } else if (typeof data === 'object' && data.generated_text) {
-      // Object format: { generated_text: "..." }
-      responseMessage = data.generated_text;
-    } else if (typeof data === 'string') {
-      // Direct string
-      responseMessage = data;
-    } else {
-      console.error('Unexpected response format:', data);
-      throw new Error('Could not extract response text from API');
-    }
-    
-    // Trim and validate
-    responseMessage = String(responseMessage || '').trim();
-    if (!responseMessage) {
-      throw new Error('Empty response from HuggingFace API');
-    }
-
-    res.status(200).json({
-      success: true,
-      response: responseMessage,
-    });
 
   } catch (error) {
     console.error('API Error:', error instanceof Error ? error.message : error);
-    console.error('Full error:', error);
     
-    const errorDetails = error instanceof Error 
-      ? error.message 
-      : 'Unknown error occurred';
-
     res.status(500).json({
-      error: 'Failed to process your request',
-      details: errorDetails,
+      error: 'Failed to process request',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 };
