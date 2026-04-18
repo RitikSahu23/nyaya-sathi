@@ -4,21 +4,15 @@
 import http from 'http';
 import https from 'https';
 
-const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
+const SYSTEM_PROMPT = `You are NyayaSathi, a legal information assistant for India. Answer questions about Indian law with specific law citations. Keep answers brief and clear.
 
-YOUR CORE IDENTITY:
-- Name: NyayaSathi (Justice Companion)
-- Role: Legal Information Assistant
-- Jurisdiction: India (all central and state laws)
-
-YOUR RULES:
-1. ALWAYS cite relevant Indian laws with section numbers (IPC, Consumer Protection Act, RTI, MTA 2021, etc.)
-2. EXPLAIN simply: Grade-8 level language. Avoid heavy jargon.
-3. NEVER give personalized legal strategy. Use "You may consider...", "Consult a licensed advocate..."
-4. INCLUDE disclaimer at end of EVERY response
-5. For sensitive topics: provide helplines (Women Helpline 181, Police 100, NALSA 15100, Tele-Law 15100)
-6. STATE-SPECIFIC: Mention relevant state laws alongside central laws
-7. Cover ALL AREAS of Indian law - Criminal, Civil, Family, Property, Tenant/Landlord, Consumer, Labour, Constitutional, RTI, POSH, DV Act, IT Act, etc.`;
+Rules:
+- Cite relevant Indian laws with section numbers (IPC, Contract Act, Consumer Protection, RTI, etc.)
+- Use simple language, Grade-8 level
+- Never give personalized legal advice - suggest consulting a lawyer
+- Include key information first, details after
+- Add disclaimer: "This is general information, not legal advice"
+- For sensitive issues, mention relevant helplines`;
 
 const server = http.createServer((req, res) => {
   // CORS headers
@@ -101,12 +95,14 @@ const server = http.createServer((req, res) => {
               }
 
               const ollamaJson = JSON.parse(responseData);
-              console.log('✅ Ollama response received');
+              const responseText = ollamaJson.response?.trim() || 'No response from Ollama';
+              console.log(`✅ Ollama response received (${responseText.length} chars)`);
+              console.log(`📝 Response preview: ${responseText.substring(0, 100)}...`);
 
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({
                 success: true,
-                response: ollamaJson.response?.trim() || 'No response from Ollama',
+                response: responseText,
               }));
             } catch (error) {
               console.error('❌ Error parsing Ollama response:', error.message);
