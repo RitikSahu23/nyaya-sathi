@@ -112,11 +112,24 @@ export default async (req, res) => {
     });
 
     // Call HuggingFace Inference API
-    // Using meta-llama/Llama-2-7b-chat-hf (free, quality model)
+    // Using mistral-7b-instruct-v0.1 (faster, stable model)
     console.log('Sending request to HuggingFace with token:', HF_TOKEN ? 'SET' : 'NOT SET');
     
+    // Format messages for HuggingFace (convert to text format)
+    let conversationText = '';
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        conversationText += `System: ${msg.content}\n\n`;
+      } else if (msg.role === 'user') {
+        conversationText += `User: ${msg.content}\n\n`;
+      } else if (msg.role === 'assistant') {
+        conversationText += `Assistant: ${msg.content}\n\n`;
+      }
+    }
+    conversationText += 'Assistant: ';
+    
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf/v1/chat/completions',
+      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1',
       {
         method: 'POST',
         headers: {
@@ -124,10 +137,13 @@ export default async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: messages,
-          max_tokens: 2048,
-          temperature: 0.4,
-          top_p: 0.9,
+          inputs: conversationText,
+          parameters: {
+            max_new_tokens: 1024,
+            temperature: 0.4,
+            top_p: 0.9,
+            return_full_text: false,
+          },
         }),
       }
     );
@@ -182,12 +198,13 @@ export default async (req, res) => {
       throw new Error('Invalid JSON response from HuggingFace API');
     }
     
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    // HuggingFace Inference API returns an array
+    if (!Array.isArray(data) || !data[0]) {
       console.error('Invalid response structure:', data);
-      throw new Error('Invalid response format from HuggingFace API: missing choices');
+      throw new Error('Invalid response format from HuggingFace API: expected array');
     }
 
-    const responseMessage = data.choices[0].message.content;
+    const responseMessage = data[0].generated_text || data[0].text;
 
     res.status(200).json({
       success: true,
