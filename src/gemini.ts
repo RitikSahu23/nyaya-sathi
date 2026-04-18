@@ -1,16 +1,5 @@
 import type { Language } from './types';
 
-// Backend API URL - uses Vite environment variable or defaults based on environment
-const getBackendUrl = () => {
-  // In production, use the deployed backend
-  if (import.meta.env.PROD) {
-    // This should be set in your build or deployment
-    return import.meta.env.VITE_BACKEND_URL || window.location.origin;
-  }
-  // In development, use localhost
-  return import.meta.env.VITE_BACKEND_URL || 'http://localhost:5173';
-};
-
 export interface GeminiMessage {
   role: 'user' | 'model';
   parts: { text: string }[];
@@ -23,8 +12,7 @@ export async function sendMessageToGemini(
   selectedState: string,
   onChunk?: (text: string) => void
 ): Promise<string> {
-  const backendUrl = getBackendUrl();
-  const apiUrl = `${backendUrl}/api/gemini`;
+  const apiUrl = '/api/gemini';
 
   try {
     // If streaming is supported and callback provided

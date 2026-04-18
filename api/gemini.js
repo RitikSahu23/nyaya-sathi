@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
@@ -7,13 +7,6 @@ if (!API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(API_KEY);
-
-// Enable CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
 
 // System prompt for NyayaSathi
 const GEMINI_SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice. You must never tell a user exactly what to do in a way that replaces consulting a licensed advocate.
@@ -74,7 +67,7 @@ RESPONSE STRUCTURE (ALWAYS follow this format):
 ## ⚠️ Disclaimer
 This is general legal information only and does not constitute legal advice. Every legal situation is unique. Please consult a licensed advocate or approach your nearest District Legal Services Authority (DLSA) for free legal aid. NyayaSathi is an information tool, not a law firm.`;
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     res.status(200).end();
