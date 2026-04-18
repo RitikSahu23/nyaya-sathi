@@ -2,12 +2,7 @@
 // This lets us test locally without vercel/serverless complexity
 
 import http from 'http';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import fs from 'fs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import https from 'https';
 
 const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
 
@@ -25,7 +20,7 @@ YOUR RULES:
 6. STATE-SPECIFIC: Mention relevant state laws alongside central laws
 7. Cover ALL AREAS of Indian law - Criminal, Civil, Family, Property, Tenant/Landlord, Consumer, Labour, Constitutional, RTI, POSH, DV Act, IT Act, etc.`;
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -45,7 +40,7 @@ const server = http.createServer(async (req, res) => {
       body += chunk.toString();
     });
 
-    req.on('end', async () => {
+    req.on('end', () => {
       try {
         const data = JSON.parse(body);
         const { userMessage, chatHistory, language, selectedState } = data;
@@ -71,33 +66,73 @@ const server = http.createServer(async (req, res) => {
 
         conversationText += `User: ${userMessage}\n\nAssistant: `;
 
-        console.log('Calling Ollama API...');
+        console.log('📤 Calling Ollama API...');
 
-        // Call Ollama
-        const ollamaRes = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'mistral',
-            prompt: conversationText,
-            stream: false,
-            temperature: 0.4,
-          }),
+        // Call Ollama using http.request
+        const ollamaData = JSON.stringify({
+          model: 'mistral',
+          prompt: conversationText,
+          stream: false,
+          temperature: 0.4,
         });
 
-        if (!ollamaRes.ok) {
-          throw new Error(`Ollama error: ${ollamaRes.status}`);
-        }
+        const options = {
+          hostname: 'localhost',
+          port: 11434,
+          path: '/api/generate',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(ollamaData),
+          },
+        };
 
-        const ollamaData = await ollamaRes.json();
+        const ollamaReq = http.request(options, (ollamaRes) => {
+          let responseData = '';
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          success: true,
-          response: ollamaData.response.trim(),
-        }));
+          ollamaRes.on('data', chunk => {
+            responseData += chunk;
+          });
+
+          ollamaRes.on('end', () => {
+            try {
+              if (ollamaRes.statusCode !== 200) {
+                throw new Error(`Ollama HTTP ${ollamaRes.statusCode}`);
+              }
+
+              const ollamaJson = JSON.parse(responseData);
+              console.log('✅ Ollama response received');
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                success: true,
+                response: ollamaJson.response?.trim() || 'No response from Ollama',
+              }));
+            } catch (error) {
+              console.error('❌ Error parsing Ollama response:', error.message);
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'Failed to parse Ollama response',
+                details: error.message,
+              }));
+            }
+          });
+        });
+
+        ollamaReq.on('error', (error) => {
+          console.error('❌ Ollama connection error:', error.message);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Failed to connect to Ollama',
+            details: error.message,
+            hint: 'Make sure Ollama is running: ollama serve',
+          }));
+        });
+
+        ollamaReq.write(ollamaData);
+        ollamaReq.end();
       } catch (error) {
-        console.error('API Error:', error);
+        console.error('❌ API Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           error: 'Failed to process request',
@@ -108,7 +143,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Serve Vite frontend
+  // Not found
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
 });
@@ -116,7 +151,9 @@ const server = http.createServer(async (req, res) => {
 const PORT = 3000;
 server.listen(PORT, () => {
   console.log(`\n✅ Development server running on http://localhost:${PORT}`);
-  console.log(`Frontend: http://localhost:5173 (run 'npm run dev' in another terminal)`);
+  console.log(`Frontend: http://localhost:5173`);
   console.log(`API proxy: http://localhost:${PORT}/api/gemini`);
-  console.log(`\nMake sure Ollama is running: ollama serve\n`);
+  console.log(`\n⚠️  Make sure you have running in separate terminals:`);
+  console.log(`   1. Ollama: ollama serve`);
+  console.log(`   2. Frontend: npm run dev (in another terminal)\n`);
 });
