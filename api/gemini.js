@@ -1,34 +1,6 @@
-// Ollama API backend for NyayaSathi
-// For local development: Install Ollama, run: ollama pull mistral
-// Then: ollama serve (keeps running in background)
-
-const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/generate';
-const OLLAMA_PULL_URL = process.env.OLLAMA_API_URL?.replace('/api/generate', '/api/pull') || 'http://localhost:11434/api/pull';
-
-// Try to pull mistral model on startup
-async function ensureModelLoaded() {
-  try {
-    console.log('Checking if mistral model is available...');
-    // Give Ollama time to start
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const pullResponse = await fetch(OLLAMA_PULL_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mistral' }),
-      timeout: 5000,
-    }).catch(() => null);
-    
-    if (pullResponse?.ok) {
-      console.log('Mistral model loaded successfully');
-    }
-  } catch (err) {
-    console.log('Model loading in background...', err.message);
-  }
-}
-
-// Start model loading (don't wait for it)
-ensureModelLoaded();
+// Together AI API backend for NyayaSathi
+// Free tier: https://www.together.ai
+// Instant setup, no deployment issues!
 
 const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
 
@@ -84,6 +56,16 @@ export default async (req, res) => {
       return res.status(400).json({ error: 'userMessage is required and must be a string' });
     }
 
+    // Check Together API key
+    const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
+    if (!TOGETHER_API_KEY) {
+      console.error('TOGETHER_API_KEY environment variable is not set');
+      return res.status(500).json({ 
+        error: 'Server misconfigured',
+        message: 'TOGETHER_API_KEY is missing. Please set it in Vercel environment variables.'
+      });
+    }
+
     // Build enhanced message with context
     const languageHint = language === 'hinglish' 
       ? '\n\n[Please respond in Hinglish - Hindi-English mix. Use English for legal terms, explain in Hindi-English.]'
@@ -96,92 +78,212 @@ export default async (req, res) => {
     const finalMessage = userMessage + languageHint + stateHint;
 
     // Build conversation history
-    let conversationText = SYSTEM_PROMPT + '\n\n---\n\n';
+    let messages = [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT
+      }
+    ];
     
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {
       for (const msg of chatHistory) {
-        const role = msg.role === 'model' ? 'Assistant' : 'User';
-        const content = msg.parts?.[0]?.text || msg.content || '';
-        if (content) {
-          conversationText += `${role}: ${content}\n\n`;
+        if (msg.role === 'user') {
+          messages.push({
+            role: 'user',
+            content: msg.parts?.[0]?.text || msg.content || ''
+          });
+        } else if (msg.role === 'model' || msg.role === 'assistant') {
+          messages.push({
+            role: 'assistant',
+            content: msg.parts?.[0]?.text || msg.content || ''
+          });
         }
       }
     }
 
-    conversationText += `User: ${finalMessage}\n\nAssistant: `;
+    // Add current message
+    messages.push({
+      role: 'user',
+      content: finalMessage
+    });
 
-    console.log('Sending request to Ollama...');
+    console.log('Sending request to Together AI...');
+
+    // Call Together AI API
+    const response = await fetch('https://api.together.xyz/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TOGETHER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/Llama-2-70b-chat-hf',
+        messages: messages,
+        max_tokens: 1024,
+        temperature: 0.4,
+        top_p: 0.9,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Together AI Error:', response.status, errorData);
+      
+      if (response.status === 401) {
+        return res.status(500).json({
+          error: 'API Authentication Failed',
+          message: 'TOGETHER_API_KEY is invalid. Please update it in Vercel Environment Variables.'
+        });
+      }
+
+      return res.status(response.status).json({
+        error: 'Failed to get response from Together AI',
+        details: errorData.error?.message || response.statusText,
+      });
+    }
+
+    const data = await response.json();
     
-    // Use the pre-defined OLLAMA_URL constant
-    try {
-      const response = await fetch(OLLAMA_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'mistral',
-          prompt: conversationText,
-          stream: false,
-          temperature: 0.4,
-        }),
-      });
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Invalid response format:', data);
+      throw new Error('Invalid response format from Together AI');
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Ollama response error:', response.status, errorText.substring(0, 200));
-        
-        // If model not found, give helpful message
-        if (response.status === 404 || errorText.includes('not found')) {
-          throw new Error('Mistral model not found. On first deployment, the model may need to load. Please wait 5-10 minutes and try again.');
-        }
-        
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
-      }
+    const responseMessage = data.choices[0].message.content.trim();
 
-      const data = await response.json();
-      
-      if (!data.response) {
-        throw new Error('No response from Ollama');
-      }
+    res.status(200).json({
+      success: true,
+      response: responseMessage,
+    });
 
-      return res.status(200).json({
-        success: true,
-        response: data.response.trim(),
-      });
+  } catch (error) {
+    console.error('API Error:', error instanceof Error ? error.message : error);
+    
+    const errorDetails = error instanceof Error 
+      ? error.message 
+      : 'Unknown error occurred';
 
-    } catch (ollamaError) {
-      console.error('Ollama Error:', ollamaError.message);
-      
-      // Fallback: Return demo response
-      console.log('Ollama not available. Using demo mode.');
-      
-      const demoResponse = `## Your Question: ${userMessage.substring(0, 50)}...
-
-## Relevant Indian Laws
-- Indian Penal Code (IPC)
-- Consumer Protection Act, 2019
-- Constitution of India
-- State-specific laws (${selectedState || 'Your State'})
-
-## Simple Explanation
-This is a demo response. To get real AI responses:
-
-**For Development:** Install and run Ollama locally
-- Download: https://ollama.ai
-- Run: \`ollama pull mistral\` then \`ollama serve\`
-- The app will automatically connect to your local Ollama
-
-**General Legal Info:** Consult DLSA or Bar Council
+    res.status(500).json({
+      error: 'Failed to process your request',
+      details: errorDetails,
+    });
+  }
+};
 
 ## Disclaimer
-This is general legal information only - not legal advice. For proper legal guidance, consult a licensed advocate or your nearest District Legal Services Authority (DLSA).`;
+This is general legal information only - not legal advice. Please consult a licensed advocate or approach your nearest District Legal Services Authority (DLSA) for free legal aid.`;
 
-      return res.status(200).json({
-        success: true,
-        response: demoResponse,
+export default async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
+  try {
+    const { userMessage, chatHistory, language, selectedState } = req.body;
+
+    if (!userMessage || typeof userMessage !== 'string') {
+      return res.status(400).json({ error: 'userMessage is required and must be a string' });
+    }
+
+    // Build enhanced message with context
+    const languageHint = language === 'hinglish' 
+      ? '\n\n[Please respond in Hinglish - Hindi-English mix. Use English for legal terms, explain in Hindi-English.]'
+      : '';
+
+    const stateHint = selectedState 
+      ? `\n\n[User is from ${selectedState}, India. Mention state-specific laws alongside central laws.]`
+      : '';
+
+    const finalMessage = userMessage + languageHint + stateHint;
+
+    // Build conversation history
+    let messages = [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT
+      }
+    ];
+    
+    if (Array.isArray(chatHistory) && chatHistory.length > 0) {
+      for (const msg of chatHistory) {
+        if (msg.role === 'user') {
+          messages.push({
+            role: 'user',
+            content: msg.parts?.[0]?.text || msg.content || ''
+          });
+        } else if (msg.role === 'model' || msg.role === 'assistant') {
+          messages.push({
+            role: 'assistant',
+            content: msg.parts?.[0]?.text || msg.content || ''
+          });
+        }
+      }
+    }
+
+    // Add current message
+    messages.push({
+      role: 'user',
+      content: finalMessage
+    });
+
+    console.log('Sending request to Together AI...');
+
+    // Call Together AI API
+    const response = await fetch('https://api.together.xyz/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TOGETHER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/Llama-2-70b-chat-hf',
+        messages: messages,
+        max_tokens: 1024,
+        temperature: 0.4,
+        top_p: 0.9,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Together AI Error:', response.status, errorData);
+      
+      if (response.status === 401) {
+        return res.status(500).json({
+          error: 'API Authentication Failed',
+          message: 'TOGETHER_API_KEY is invalid. Please update it in Vercel Environment Variables.'
+        });
+      }
+
+      return res.status(response.status).json({
+        error: 'Failed to get response from Together AI',
+        details: errorData.error?.message || response.statusText,
       });
     }
+
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Invalid response format:', data);
+      throw new Error('Invalid response format from Together AI');
+    }
+
+    const responseMessage = data.choices[0].message.content.trim();
+
+    res.status(200).json({
+      success: true,
+      response: responseMessage,
+    });
 
   } catch (error) {
     console.error('API Error:', error instanceof Error ? error.message : error);
