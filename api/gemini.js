@@ -94,6 +94,13 @@ export default async (req, res) => {
     conversationText += `User: ${finalMessage}\n\nAssistant: `;
 
     console.log('Sending request to Ollama...');
+    console.log('OLLAMA_URL:', OLLAMA_URL);
+    console.log('Request body:', JSON.stringify({
+      model: 'mistral',
+      prompt: conversationText.substring(0, 100) + '...',
+      stream: false,
+      temperature: 0.4,
+    }));
 
     // Call Ollama API
     const response = await fetch(OLLAMA_URL, {
@@ -107,7 +114,12 @@ export default async (req, res) => {
         stream: false,
         temperature: 0.4,
       }),
+    }).catch(err => {
+      console.error('Fetch error:', err);
+      throw err;
     });
+
+    console.log('Ollama response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -135,15 +147,19 @@ export default async (req, res) => {
     });
 
   } catch (error) {
-    console.error('API Error:', error instanceof Error ? error.message : error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : 'No stack trace';
     
-    const errorDetails = error instanceof Error 
-      ? error.message 
-      : 'Unknown error occurred';
-
+    console.error('===== API ERROR =====');
+    console.error('Message:', errorMsg);
+    console.error('Stack:', errorStack);
+    console.error('Type:', typeof error);
+    console.error('====================');
+    
     res.status(500).json({
       error: 'Failed to process your request',
-      details: errorDetails,
+      details: errorMsg,
+      type: error instanceof Error ? error.constructor.name : typeof error,
     });
   }
 };
