@@ -1,6 +1,6 @@
-// Together AI API backend for NyayaSathi
-// Free tier: https://www.together.ai
-// Instant setup, no deployment issues!
+// Ollama API backend for NyayaSathi
+// Local development: Install Ollama from https://ollama.ai
+// Run: ollama pull mistral && ollama serve
 
 const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
 
@@ -56,15 +56,8 @@ export default async (req, res) => {
       return res.status(400).json({ error: 'userMessage is required and must be a string' });
     }
 
-    // Check Together API key
-    const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
-    if (!TOGETHER_API_KEY) {
-      console.error('TOGETHER_API_KEY environment variable is not set');
-      return res.status(500).json({ 
-        error: 'Server misconfigured',
-        message: 'TOGETHER_API_KEY is missing. Please set it in Vercel environment variables.'
-      });
-    }
+    // Get Ollama URL (default to localhost)
+    const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/generate';
 
     // Build enhanced message with context
     const languageHint = language === 'hinglish' 
@@ -85,71 +78,56 @@ export default async (req, res) => {
       }
     ];
     
+    // Build prompt with conversation history
+    let conversationText = SYSTEM_PROMPT + '\n\n---\n\n';
+    
     if (Array.isArray(chatHistory) && chatHistory.length > 0) {
       for (const msg of chatHistory) {
-        if (msg.role === 'user') {
-          messages.push({
-            role: 'user',
-            content: msg.parts?.[0]?.text || msg.content || ''
-          });
-        } else if (msg.role === 'model' || msg.role === 'assistant') {
-          messages.push({
-            role: 'assistant',
-            content: msg.parts?.[0]?.text || msg.content || ''
-          });
+        const role = msg.role === 'model' ? 'Assistant' : 'User';
+        const content = msg.parts?.[0]?.text || msg.content || '';
+        if (content) {
+          conversationText += `${role}: ${content}\n\n`;
         }
       }
     }
 
-    // Add current message
-    messages.push({
-      role: 'user',
-      content: finalMessage
-    });
+    conversationText += `User: ${finalMessage}\n\nAssistant: `;
 
-    console.log('Sending request to Together AI...');
+    console.log('Sending request to Ollama...');
 
-    // Call Together AI API
-    const response = await fetch('https://api.together.xyz/v1/chat/completions', {
+    // Call Ollama API
+    const response = await fetch(OLLAMA_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${TOGETHER_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'meta-llama/Llama-2-70b-chat-hf',
-        messages: messages,
-        max_tokens: 1024,
+        model: 'mistral',
+        prompt: conversationText,
+        stream: false,
         temperature: 0.4,
-        top_p: 0.9,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Together AI Error:', response.status, errorData);
+      const errorText = await response.text();
+      console.error('Ollama error:', response.status, errorText.substring(0, 200));
       
-      if (response.status === 401) {
-        return res.status(500).json({
-          error: 'API Authentication Failed',
-          message: 'TOGETHER_API_KEY is invalid. Please update it in Vercel Environment Variables.'
-        });
-      }
-
       return res.status(response.status).json({
-        error: 'Failed to get response from Together AI',
-        details: errorData.error?.message || response.statusText,
+        error: 'Failed to connect to Ollama',
+        message: 'Make sure Ollama is running locally: ollama serve',
+        details: errorText.substring(0, 500),
       });
     }
 
     const data = await response.json();
     
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    if (!data.response) {
       console.error('Invalid response format:', data);
-      throw new Error('Invalid response format from Together AI');
+      throw new Error('No response from Ollama');
     }
 
-    const responseMessage = data.choices[0].message.content.trim();
+    const responseMessage = data.response.trim();
 
     res.status(200).json({
       success: true,
