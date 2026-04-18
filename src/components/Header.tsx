@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
                 NyayaSathi
               </h1>
               <p className={`text-xs font-medium ${darkMode ? 'text-blue-300' : 'text-blue-500'}`}>
-                Legal Information Assistant</p>
+                Legal Information Assistant
               </p>
             </div>
           </div>
