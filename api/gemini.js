@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+// HuggingFace Inference API backend for NyayaSathi
 
-const GEMINI_SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
+const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
 
 YOUR CORE IDENTITY:
 - Name: NyayaSathi (Justice Companion)
@@ -51,13 +51,13 @@ export default async (req, res) => {
   }
 
   try {
-    // Check API key first
-    const API_KEY = process.env.GEMINI_API_KEY;
-    if (!API_KEY) {
-      console.error('GEMINI_API_KEY environment variable is not set');
+    // Check API token
+    const HF_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
+    if (!HF_TOKEN) {
+      console.error('HUGGINGFACE_API_TOKEN environment variable is not set');
       return res.status(500).json({ 
         error: 'Server misconfigured',
-        message: 'GEMINI_API_KEY is missing. Please set it in Vercel environment variables.'
+        message: 'HUGGINGFACE_API_TOKEN is missing. Please set it in Vercel environment variables.'
       });
     }
 
@@ -68,14 +68,7 @@ export default async (req, res) => {
       return res.status(400).json({ error: 'userMessage is required and must be a string' });
     }
 
-    // Initialize Gemini
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: GEMINI_SYSTEM_PROMPT,
-    });
-
-    // Build enhanced message
+    // Build enhanced message with context
     const languageHint = language === 'hinglish' 
       ? '\n\n[Please respond in Hinglish - Hindi-English mix. Use English for legal terms, explain in Hindi-English.]'
       : '';
@@ -86,18 +79,74 @@ export default async (req, res) => {
 
     const finalMessage = userMessage + languageHint + stateHint;
 
-    // Start chat
-    const chat = model.startChat({
-      history: Array.isArray(chatHistory) ? chatHistory : [],
-      generationConfig: {
-        maxOutputTokens: 2048,
-        temperature: 0.4,
-      },
+    // Build conversation history for HuggingFace
+    let messages = [];
+    
+    // Add system message
+    messages.push({
+      role: 'system',
+      content: SYSTEM_PROMPT
     });
 
-    // Send message
-    const result = await chat.sendMessage(finalMessage);
-    const responseText = result.response.text();
+    // Add chat history
+    if (Array.isArray(chatHistory) && chatHistory.length > 0) {
+      for (const msg of chatHistory) {
+        if (msg.role === 'user') {
+          messages.push({
+            role: 'user',
+            content: msg.parts?.[0]?.text || msg.content || ''
+          });
+        } else if (msg.role === 'model' || msg.role === 'assistant') {
+          messages.push({
+            role: 'assistant',
+            content: msg.parts?.[0]?.text || msg.content || ''
+          });
+        }
+      }
+    }
+
+    // Add current message
+    messages.push({
+      role: 'user',
+      content: finalMessage
+    });
+
+    // Call HuggingFace Inference API
+    // Using meta-llama/Llama-2-7b-chat-hf (free, quality model)
+    const response = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HF_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: messages,
+          max_tokens: 2048,
+          temperature: 0.4,
+          top_p: 0.9,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('HuggingFace API Error:', errorData);
+      
+      return res.status(response.status).json({
+        error: 'Failed to get response from HuggingFace API',
+        details: errorData.error || response.statusText,
+      });
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from HuggingFace API');
+    }
+
+    const responseText = data.choices[0].message.content;
 
     res.status(200).json({
       success: true,
@@ -105,7 +154,7 @@ export default async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Gemini API Error:', error);
+    console.error('API Error:', error);
     
     const errorDetails = error instanceof Error 
       ? error.message 
