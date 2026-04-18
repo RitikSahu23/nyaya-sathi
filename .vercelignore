@@ -1,0 +1,13 @@
+# Don't ignore API directory
+!api/
+
+# Ignore common unnecessary files
+.git
+.gitignore
+node_modules
+dist
+.env.local
+.env
+.DS_Store
+npm-debug.log
+.vercel
