@@ -112,24 +112,25 @@ export default async (req, res) => {
     });
 
     // Call HuggingFace Inference API
-    // Using mistral-7b-instruct-v0.1 (faster, stable model)
+    // Using google/flan-t5-large (proven stable model on free tier)
     console.log('Sending request to HuggingFace with token:', HF_TOKEN ? 'SET' : 'NOT SET');
     
-    // Format messages for HuggingFace (convert to text format)
+    // Format messages for HuggingFace text generation
     let conversationText = '';
     for (const msg of messages) {
       if (msg.role === 'system') {
-        conversationText += `System: ${msg.content}\n\n`;
+        conversationText += msg.content + '\n\n';
       } else if (msg.role === 'user') {
-        conversationText += `User: ${msg.content}\n\n`;
+        conversationText += msg.content + '\n\n';
       } else if (msg.role === 'assistant') {
-        conversationText += `Assistant: ${msg.content}\n\n`;
+        conversationText += msg.content + '\n\n';
       }
     }
-    conversationText += 'Assistant: ';
+    
+    console.log('Request text length:', conversationText.length);
     
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1',
+      'https://api-inference.huggingface.co/models/google/flan-t5-large',
       {
         method: 'POST',
         headers: {
@@ -139,10 +140,9 @@ export default async (req, res) => {
         body: JSON.stringify({
           inputs: conversationText,
           parameters: {
-            max_new_tokens: 1024,
-            temperature: 0.4,
-            top_p: 0.9,
-            return_full_text: false,
+            max_length: 512,
+            do_sample: true,
+            temperature: 0.7,
           },
         }),
       }
@@ -198,13 +198,30 @@ export default async (req, res) => {
       throw new Error('Invalid JSON response from HuggingFace API');
     }
     
-    // HuggingFace Inference API returns an array
-    if (!Array.isArray(data) || !data[0]) {
-      console.error('Invalid response structure:', data);
-      throw new Error('Invalid response format from HuggingFace API: expected array');
+    console.log('Response data type:', typeof data, 'Is array:', Array.isArray(data));
+    console.log('Response data sample:', JSON.stringify(data).substring(0, 300));
+    
+    // Handle different response formats
+    let responseMessage = '';
+    if (Array.isArray(data) && data.length > 0) {
+      // Array format: [{ generated_text: "..." }]
+      responseMessage = data[0].generated_text || data[0].text || JSON.stringify(data[0]);
+    } else if (typeof data === 'object' && data.generated_text) {
+      // Object format: { generated_text: "..." }
+      responseMessage = data.generated_text;
+    } else if (typeof data === 'string') {
+      // Direct string
+      responseMessage = data;
+    } else {
+      console.error('Unexpected response format:', data);
+      throw new Error('Could not extract response text from API');
     }
-
-    const responseMessage = data[0].generated_text || data[0].text;
+    
+    // Trim and validate
+    responseMessage = String(responseMessage || '').trim();
+    if (!responseMessage) {
+      throw new Error('Empty response from HuggingFace API');
+    }
 
     res.status(200).json({
       success: true,
