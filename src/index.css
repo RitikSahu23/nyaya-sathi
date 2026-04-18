@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+/* Custom font setup */
+:root {
+  --font-sans: 'Inter', 'Poppins', system-ui, -apple-system, sans-serif;
+  --font-display: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.35s ease-out forwards;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+/* Typing cursor for streaming */
+.streaming-cursor::after {
+  content: '▋';
+  animation: pulse 0.8s ease-in-out infinite;
+  color: #3b82f6;
+  margin-left: 2px;
+}
+
+/* Prose overrides */
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+  background: #bfdbfe;
+  color: #1e3a8a;
+}
+
+/* Mobile tap highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth transition for dark mode */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
+
+/* But don't transition animations */
+.animate-fadeIn,
+.animate-slideInRight,
+[class*='animate-'],
+[style*='animation'] {
+  transition: none !important;
+}
+
+/* Hero gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #f97316, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Prose table styling */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.prose table th {
+  background: #eff6ff;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  text-align: left;
+  border: 1px solid #dbeafe;
+}
+
+.prose table td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+}
+
+/* Ensure devanagari script renders nicely */
+:lang(hi) {
+  font-family: 'Noto Sans Devanagari', var(--font-sans);
+  line-height: 1.8;
+}
+
+/* RTL support baseline */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Large font mode */
+.text-large-mode {
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+
+/* Saffron pulse for brand element */
+@keyframes saffronPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+  }
+}
+
+.saffron-pulse {
+  animation: saffronPulse 2s ease-in-out infinite;
+}
+
+/* Striped loader */
+@keyframes stripeMove {
+  from { background-position: 0 0; }
+  to { background-position: 40px 0; }
+}
+
+/* Custom number badge */
+.badge-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1e40af;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
