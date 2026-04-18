@@ -4,15 +4,7 @@
 import http from 'http';
 import https from 'https';
 
-const SYSTEM_PROMPT = `You are NyayaSathi, a legal information assistant for India. Answer questions about Indian law with specific law citations. Keep answers brief and clear.
-
-Rules:
-- Cite relevant Indian laws with section numbers (IPC, Contract Act, Consumer Protection, RTI, etc.)
-- Use simple language, Grade-8 level
-- Never give personalized legal advice - suggest consulting a lawyer
-- Include key information first, details after
-- Add disclaimer: "This is general information, not legal advice"
-- For sensitive issues, mention relevant helplines`;
+const SYSTEM_PROMPT = `You are NyayaSathi, a legal information assistant for India. Answer questions about Indian law with specific law citations. Keep answers brief and clear. Use simple language. Never give personalized legal advice.`;
 
 const server = http.createServer((req, res) => {
   // CORS headers
@@ -45,27 +37,35 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        // Build conversation history
-        let conversationText = SYSTEM_PROMPT + '\n\n---\n\n';
+        // Build prompt with context
+        let prompt = `${SYSTEM_PROMPT}\n\n`;
 
+        // Add context about state if provided
+        if (selectedState) {
+          prompt += `Context: The user is asking about ${selectedState} state laws in India.\n\n`;
+        }
+
+        // Add chat history
         if (Array.isArray(chatHistory) && chatHistory.length > 0) {
           for (const msg of chatHistory) {
             const role = msg.role === 'model' ? 'Assistant' : 'User';
             const content = msg.parts?.[0]?.text || msg.content || '';
             if (content) {
-              conversationText += `${role}: ${content}\n\n`;
+              prompt += `${role}: ${content}\n`;
             }
           }
+          prompt += '\n';
         }
 
-        conversationText += `User: ${userMessage}\n\nAssistant: `;
+        // Add current question
+        prompt += `User: ${userMessage}\n\nAnswer the question above about Indian law. Provide specific law citations. Keep it clear and simple.\n\nAssistant:`;
 
         console.log('📤 Calling Ollama API...');
 
         // Call Ollama using http.request
         const ollamaData = JSON.stringify({
           model: 'tinyllama',
-          prompt: conversationText,
+          prompt: prompt,
           stream: false,
           temperature: 0.4,
         });
@@ -95,7 +95,21 @@ const server = http.createServer((req, res) => {
               }
 
               const ollamaJson = JSON.parse(responseData);
-              const responseText = ollamaJson.response?.trim() || 'No response from Ollama';
+              let responseText = ollamaJson.response?.trim() || 'No response from Ollama';
+              
+              // Clean up response: remove various labels that tinyllama might add at start of lines
+              responseText = responseText
+                .split('\n')
+                .map(line => {
+                  // Remove question, response, user, assistant, answer labels from line start
+                  return line
+                    .replace(/^(Question|Response|User|Assistant|Answer):\s*/i, '')
+                    .replace(/^(Question|Response):\s*"[^"]*"\s*/i, '');
+                })
+                .join('\n')
+                .replace(/^\n+/, '') // Remove leading newlines
+                .trim();
+              
               console.log(`✅ Ollama response received (${responseText.length} chars)`);
               console.log(`📝 Response preview: ${responseText.substring(0, 100)}...`);
 
