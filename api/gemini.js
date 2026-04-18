@@ -113,6 +113,8 @@ export default async (req, res) => {
 
     // Call HuggingFace Inference API
     // Using meta-llama/Llama-2-7b-chat-hf (free, quality model)
+    console.log('Sending request to HuggingFace with token:', HF_TOKEN ? 'SET' : 'NOT SET');
+    
     const response = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf/v1/chat/completions',
       {
@@ -130,38 +132,78 @@ export default async (req, res) => {
       }
     );
 
+    // Get response text for logging
+    const responseText = await response.text();
+    console.log('HuggingFace Response Status:', response.status);
+    console.log('HuggingFace Response Body:', responseText.substring(0, 200));
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('HuggingFace API Error:', errorData);
+      let errorData = {};
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { raw: responseText };
+      }
+      
+      console.error('HuggingFace API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData
+      });
+      
+      // Check if token is missing
+      if (response.status === 401) {
+        return res.status(500).json({
+          error: 'API Authentication Failed',
+          message: 'HUGGINGFACE_API_TOKEN is invalid or expired. Please update it in Vercel Environment Variables.'
+        });
+      }
+      
+      // Check if model is loading
+      if (response.status === 503) {
+        return res.status(503).json({
+          error: 'Model Loading',
+          message: 'The AI model is currently loading. Please try again in 30 seconds.'
+        });
+      }
       
       return res.status(response.status).json({
         error: 'Failed to get response from HuggingFace API',
-        details: errorData.error || response.statusText,
+        status: response.status,
+        details: errorData.error?.message || errorData.error || response.statusText,
       });
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse HuggingFace response:', e);
+      throw new Error('Invalid JSON response from HuggingFace API');
+    }
     
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('Invalid response format from HuggingFace API');
+      console.error('Invalid response structure:', data);
+      throw new Error('Invalid response format from HuggingFace API: missing choices');
     }
 
-    const responseText = data.choices[0].message.content;
+    const responseMessage = data.choices[0].message.content;
 
     res.status(200).json({
       success: true,
-      response: responseText,
+      response: responseMessage,
     });
 
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('API Error:', error instanceof Error ? error.message : error);
+    console.error('Full error:', error);
     
     const errorDetails = error instanceof Error 
       ? error.message 
       : 'Unknown error occurred';
 
     res.status(500).json({
-      error: 'Failed to get response from AI',
+      error: 'Failed to process your request',
       details: errorDetails,
     });
   }
