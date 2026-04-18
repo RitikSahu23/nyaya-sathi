@@ -2,6 +2,34 @@
 // For local development: Install Ollama, run: ollama pull mistral
 // Then: ollama serve (keeps running in background)
 
+const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/generate';
+const OLLAMA_PULL_URL = process.env.OLLAMA_API_URL?.replace('/api/generate', '/api/pull') || 'http://localhost:11434/api/pull';
+
+// Try to pull mistral model on startup
+async function ensureModelLoaded() {
+  try {
+    console.log('Checking if mistral model is available...');
+    // Give Ollama time to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const pullResponse = await fetch(OLLAMA_PULL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'mistral' }),
+      timeout: 5000,
+    }).catch(() => null);
+    
+    if (pullResponse?.ok) {
+      console.log('Mistral model loaded successfully');
+    }
+  } catch (err) {
+    console.log('Model loading in background...', err.message);
+  }
+}
+
+// Start model loading (don't wait for it)
+ensureModelLoaded();
+
 const SYSTEM_PROMPT = `You are NyayaSathi, an AI legal information assistant for India. You provide ONLY general legal information, never personalized legal advice.
 
 YOUR CORE IDENTITY:
@@ -84,11 +112,9 @@ export default async (req, res) => {
 
     console.log('Sending request to Ollama...');
     
-    // Get Ollama URL from environment or use local default
-    const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/generate';
-    
+    // Use the pre-defined OLLAMA_URL constant
     try {
-      const response = await fetch(ollamaUrl, {
+      const response = await fetch(OLLAMA_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +128,15 @@ export default async (req, res) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Ollama error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Ollama response error:', response.status, errorText.substring(0, 200));
+        
+        // If model not found, give helpful message
+        if (response.status === 404 || errorText.includes('not found')) {
+          throw new Error('Mistral model not found. On first deployment, the model may need to load. Please wait 5-10 minutes and try again.');
+        }
+        
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
