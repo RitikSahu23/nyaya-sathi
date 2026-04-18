@@ -84,7 +84,7 @@ export default async (req, res) => {
 
     console.log('Sending request to Ollama...');
     
-    // Try Ollama first (local development)
+    // Get Ollama URL from environment or use local default
     const ollamaUrl = process.env.OLLAMA_API_URL || 'http://localhost:11434/api/generate';
     
     try {
