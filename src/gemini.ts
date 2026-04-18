@@ -12,16 +12,8 @@ export async function sendMessageToGemini(
   selectedState: string,
   onChunk?: (text: string) => void
 ): Promise<string> {
-  const apiUrl = '/api/gemini';
-
   try {
-    // If streaming is supported and callback provided
-    if (onChunk && typeof EventSource !== 'undefined') {
-      return await streamFromBackend(apiUrl, userMessage, history, language, selectedState, onChunk);
-    }
-
-    // Fallback to regular POST request
-    const response = await fetch(apiUrl, {
+    const response = await fetch('/api/gemini', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,76 +27,25 @@ export async function sendMessageToGemini(
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `HTTP ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
     }
 
     const data = await response.json();
+    
+    if (onChunk) {
+      // Call onChunk with the full response
+      onChunk(data.response);
+    }
+    
     return data.response;
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('Failed to fetch')) {
-        throw new Error('Backend service is unavailable. Please check your internet connection or contact support.');
+        throw new Error('Cannot connect to backend. Please check your internet connection.');
       }
       throw error;
     }
     throw new Error('Unknown error occurred');
   }
-}
-
-async function streamFromBackend(
-  apiUrl: string,
-  userMessage: string,
-  history: GeminiMessage[],
-  language: 'english' | 'hinglish',
-  selectedState: string,
-  onChunk: (text: string) => void
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const payload = {
-      userMessage,
-      chatHistory: history,
-      language,
-      selectedState,
-    };
-
-    fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      },
-      body: JSON.stringify(payload),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        return response.text();
-      })
-      .then((text) => {
-        let fullText = '';
-        const lines = text.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              if (data.text) {
-                fullText += data.text;
-                onChunk(data.text);
-              }
-              if (data.done) {
-                resolve(data.fullText || fullText);
-              }
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        }
-        resolve(fullText);
-      })
-      .catch((error) => {
-        reject(error);
-      });
-  });
 }
