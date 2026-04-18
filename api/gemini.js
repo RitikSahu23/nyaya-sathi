@@ -109,7 +109,7 @@ export default async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'mistral',
+        model: 'tinyllama',
         prompt: conversationText,
         stream: false,
         temperature: 0.4,

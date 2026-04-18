@@ -70,7 +70,7 @@ const server = http.createServer((req, res) => {
 
         // Call Ollama using http.request
         const ollamaData = JSON.stringify({
-          model: 'mistral',
+          model: 'tinyllama',
           prompt: conversationText,
           stream: false,
           temperature: 0.4,
