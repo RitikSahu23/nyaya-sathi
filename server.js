@@ -77,18 +77,29 @@ const server = http.createServer((req, res) => {
               const ollamaJson = JSON.parse(responseData);
               let responseText = ollamaJson.response?.trim() || 'No response from Ollama';
               
-              // Clean up response: remove various labels that tinyllama might add at start of lines
-              responseText = responseText
-                .split('\n')
-                .map(line => {
-                  // Remove question, response, user, assistant, answer labels from line start
-                  return line
-                    .replace(/^(Question|Response|User|Assistant|Answer):\s*/i, '')
-                    .replace(/^(Question|Response):\s*"[^"]*"\s*/i, '');
-                })
-                .join('\n')
-                .replace(/^\n+/, '') // Remove leading newlines
-                .trim();
+              // Detect if tinyllama just generated a new question instead of an answer
+              // (This is a hallucination pattern where it repeats/invents questions)
+              const hasNewQuestion = /^[^.!?]*\?[^.!?]*\n/.test(responseText) || 
+                                     /^User:\s+\w/.test(responseText) ||
+                                     /^Question:\s+/.test(responseText);
+              
+              if (hasNewQuestion && !userMessage.includes('?')) {
+                // User didn't ask a question, but response started with one - likely hallucination
+                responseText = 'Unable to generate reliable response. Please try rephrasing your question.';
+              } else {
+                // Clean up response: remove various labels that tinyllama might add at start of lines
+                responseText = responseText
+                  .split('\n')
+                  .map(line => {
+                    // Remove question, response, user, assistant, answer labels from line start
+                    return line
+                      .replace(/^(Question|Response|User|Assistant|Answer):\s*/i, '')
+                      .replace(/^(Question|Response):\s*"[^"]*"\s*/i, '');
+                  })
+                  .join('\n')
+                  .replace(/^\n+/, '') // Remove leading newlines
+                  .trim();
+              }
               
               console.log(`✅ Ollama response received (${responseText.length} chars)`);
               console.log(`📝 Response preview: ${responseText.substring(0, 100)}...`);
