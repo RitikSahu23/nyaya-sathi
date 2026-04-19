@@ -4,7 +4,7 @@
 import http from 'http';
 import https from 'https';
 
-const SYSTEM_PROMPT = `You are NyayaSathi, a legal information assistant for India. Answer questions about Indian law with specific law citations. Keep answers brief and clear. Use simple language. Never give personalized legal advice.`;
+const SYSTEM_PROMPT = `You answer legal questions about Indian law. Be brief. Cite laws.`;
 
 const server = http.createServer((req, res) => {
   // CORS headers
@@ -37,28 +37,8 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        // Build prompt with context
-        let prompt = `${SYSTEM_PROMPT}\n\n`;
-
-        // Add context about state if provided
-        if (selectedState) {
-          prompt += `Context: The user is asking about ${selectedState} state laws in India.\n\n`;
-        }
-
-        // Add chat history
-        if (Array.isArray(chatHistory) && chatHistory.length > 0) {
-          for (const msg of chatHistory) {
-            const role = msg.role === 'model' ? 'Assistant' : 'User';
-            const content = msg.parts?.[0]?.text || msg.content || '';
-            if (content) {
-              prompt += `${role}: ${content}\n`;
-            }
-          }
-          prompt += '\n';
-        }
-
-        // Add current question
-        prompt += `User: ${userMessage}\n\nAnswer the question above about Indian law. Provide specific law citations. Keep it clear and simple.\n\nAssistant:`;
+        // Build prompt that forces direct answer
+        let prompt = `You are a legal assistant. Answer the question directly with Indian law references.\n\nQ: ${userMessage}\n\nA:`;
 
         console.log('📤 Calling Ollama API...');
 
@@ -67,7 +47,7 @@ const server = http.createServer((req, res) => {
           model: 'tinyllama',
           prompt: prompt,
           stream: false,
-          temperature: 0.4,
+          temperature: 0.1,
         });
 
         const options = {
