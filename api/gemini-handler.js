@@ -473,17 +473,28 @@ export async function generateGeminiResponse(payload, options = {}) {
     process.env.OLLAMA_MODEL ||
     'qwen2.5:3b';
   
-  // Forced to Ollama as per user request to avoid Gemini limitations
-  const provider = 'ollama';
+  // Use Gemini for Vercel deployment, Ollama for local development
+  const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+  const provider = isVercel ? 'gemini' : 'ollama';
 
   const finalMessage = buildUserMessage({ userMessage, language, selectedState });
   const references = retrieveLegalReferences(userMessage, selectedState);
 
-  return generateOllamaResponse({
-    finalMessage,
-    chatHistory,
-    ollamaUrl,
-    ollamaModel,
-    references,
-  });
+  if (provider === 'gemini') {
+    return generateGoogleResponse({
+      finalMessage,
+      chatHistory,
+      apiKey,
+      model: 'gemini-2.0-flash-exp',
+      references,
+    });
+  } else {
+    return generateOllamaResponse({
+      finalMessage,
+      chatHistory,
+      ollamaUrl,
+      ollamaModel,
+      references,
+    });
+  }
 }
