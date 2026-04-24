@@ -40,19 +40,23 @@ An AI-powered **legal information assistant** (not a law firm, not legal advice)
 │         │                                            │
 │         ▼                                            │
 │  ┌─────────────────────────────────────────────────┐│
-│  │         Gemini 2.0 Flash API (Free Tier)        ││
-│  │         @google/generative-ai SDK               ││
-│  │         System: NyayaSathi Legal Prompt         ││
+│  │         Development Server (Node.js)            ││
+│  │         ┌─────────────────────────────────────┐ ││
+│  │         │      Ollama Local AI (qwen2.5:3b)   │ ││
+│  │         │      Legal Reference Database      │ ││
+│  │         │      NyayaSathi System Prompt      │ ││
+│  │         └─────────────────────────────────────┘ ││
 │  └─────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────┘
 ```
 
 **Data Flow:**
 1. User types/speaks a legal question
-2. Query sent to Gemini 2.0 Flash with NyayaSathi system prompt
-3. Gemini returns structured markdown response with law citations
-4. Frontend renders streamed response with section references
-5. User can generate documents via template engine (no backend needed)
+2. Query sent to local development server via proxy
+3. Server processes with Ollama AI (qwen2.5:3b) + legal reference database
+4. AI returns structured markdown response with law citations
+5. Frontend renders response with section references
+6. User can generate documents via template engine
 
 ---
 
@@ -62,14 +66,15 @@ An AI-powered **legal information assistant** (not a law firm, not legal advice)
 |-----------|-----------|------|
 | Frontend | React 19 + TypeScript + Vite | Free |
 | Styling | Tailwind CSS 4 | Free |
-| AI | Google Gemini 2.0 Flash API | Free tier |
+| AI | Ollama Local AI (qwen2.5:3b) | Free |
+| Backend | Node.js Development Server | Free |
+| Legal Database | Local JSON reference data | Free |
 | Document Templates | Client-side text generation | Free |
 | Voice Input | Web Speech API (browser-native) | Free |
 | Fonts | Google Fonts (Inter + Poppins) | Free |
-| Hosting | GitHub Pages / Firebase Hosting | Free |
 | Markdown Rendering | react-markdown + remark-gfm | Free |
 
-**No backend. No database. No server costs.**
+**100% offline capable. No API keys required.**
 
 ---
 
@@ -77,42 +82,58 @@ An AI-powered **legal information assistant** (not a law firm, not legal advice)
 
 ### Prerequisites
 - Node.js 18+ 
-- A free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- Ollama installed locally
+- qwen2.5:3b model (or compatible model)
 
 ### Steps
 
 ```bash
-# 1. Clone the repository
+# 1. Install Ollama (if not already installed)
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# 2. Pull the required AI model
+ollama pull qwen2.5:3b
+
+# 3. Start Ollama server
+ollama serve
+
+# 4. Clone the repository
 git clone https://github.com/your-username/nyayasathi
 cd nyayasathi
 
-# 2. Install dependencies
+# 5. Install dependencies
 npm install
 
-# 3. Create .env.local with your Gemini API key
-echo "GEMINI_API_KEY=AIzaSy..." > .env.local
+# 6. Start the development server
+node server.js
 
-# 4. Start development server
+# 7. In another terminal, start the frontend
 npm run dev
 
-# 5. Open http://localhost:5173
+# 8. Open http://localhost:5173
 ```
 
 ---
 
-## 🌐 Deployment (Recommended: Vercel)
+## 🌐 Deployment Options
 
-**Users don't need to provide their own API key anymore!** Deploy the backend to Vercel (free tier) and your Gemini API key stays private on the server.
+### Option 1: Local Deployment (Recommended)
 
-### Quick Deploy Steps:
+**Complete privacy and offline capability.** Run everything locally without any external dependencies.
 
-1. Get your free Gemini API key: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
-2. Push code to GitHub
-3. Go to [Vercel](https://vercel.com) → Connect your GitHub repo
-4. Add environment variable: `GEMINI_API_KEY` = your API key
-5. Deploy! 🎉
+### Option 2: Hybrid Deployment
 
-**No backend coding needed.** Vercel runs `api/gemini.js` as a serverless function automatically.
+- Frontend: Deploy to Vercel/Netlify (free)
+- Backend: Self-hosted server with Ollama
+- **No API keys required** - everything runs on your own infrastructure
+
+### Option 3: Cloud Deployment
+
+For cloud deployment, you'll need:
+- A server with GPU access for Ollama
+- Or use cloud AI services (requires API keys)
+
+**Local deployment is recommended for hackathon demos.**
 
 👉 **Full deployment guide:** See [DEPLOYMENT.md](./DEPLOYMENT.md)
 
@@ -133,7 +154,7 @@ npm run build
 
 ### Core
 - [x] **Interactive AI Chat** — Ask any Indian legal question, get structured answers with law citations
-- [x] **Streaming responses** — See the answer as it's generated (Gemini streaming API)
+- [x] **Streaming responses** — See the answer as it's generated (local AI processing)
 - [x] **Quick Scenarios** — One-click buttons for common legal situations
 - [x] **Bare Act Panel** — Collapsible section showing exact legal sections cited
 - [x] **Hinglish Toggle** — Switch between English and Hindi-English mix
@@ -268,8 +289,9 @@ npm run build
 - **India Code** (indiacode.nic.in) — official source for Indian legislation
 - **PRS Legislative Research** (prsindia.org) — bill summaries and analysis
 - **NALSA** — National Legal Services Authority for legal aid framework
-- **Google AI Studio** — free Gemini API access
+- **Ollama** — local AI infrastructure
+- **Meta AI** — qwen2.5:3b model
 
 ---
 
-*Built with ❤️ for Google Solutions Challenge 2024 | NyayaSathi — न्यायसाथी*
+*Built with ❤️ for Google Solutions Challenge 2026 | NyayaSathi — न्यायसाथी*
