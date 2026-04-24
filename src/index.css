@@ -4,6 +4,10 @@
 :root {
   --font-sans: 'Inter', 'Poppins', system-ui, -apple-system, sans-serif;
   --font-display: 'Poppins', 'Inter', system-ui, sans-serif;
+  --brand-navy: #0f274f;
+  --brand-blue: #1d4ed8;
+  --brand-saffron: #f97316;
+  --brand-cream: #fff7ed;
 }
 
 * {
@@ -95,12 +99,57 @@ body {
   }
 }
 
+@keyframes floatDrift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) scale(1.03);
+  }
+}
+
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes tiltGlow {
+  0%, 100% {
+    transform: rotate(-8deg) scale(1);
+    opacity: 0.32;
+  }
+  50% {
+    transform: rotate(-3deg) scale(1.08);
+    opacity: 0.5;
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.35s ease-out forwards;
 }
 
 .animate-slideInRight {
   animation: slideInRight 0.3s ease-out forwards;
+}
+
+.animate-floatDrift {
+  animation: floatDrift 7s ease-in-out infinite;
+}
+
+.animate-aurora {
+  background-size: 180% 180%;
+  animation: aurora 14s ease infinite;
+}
+
+.animate-tiltGlow {
+  animation: tiltGlow 10s ease-in-out infinite;
 }
 
 /* Typing cursor for streaming */
@@ -167,6 +216,27 @@ body {
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.glass-panel {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.mesh-bg {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(249, 115, 22, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 10%, rgba(59, 130, 246, 0.16), transparent 26%),
+    radial-gradient(circle at 70% 70%, rgba(251, 191, 36, 0.12), transparent 24%),
+    linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at center, black 45%, transparent 95%);
 }
 
 /* Prose table styling */

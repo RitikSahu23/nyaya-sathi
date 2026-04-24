@@ -28,7 +28,13 @@ export async function sendMessageToGemini(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      
+      // Better rate limit error message
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Gemini free tier allows 1-2 requests per minute. Please wait about 60 seconds and try again.');
+      }
+      
+      throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`);
     }
 
     const data = await response.json();

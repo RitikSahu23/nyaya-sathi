@@ -29,15 +29,15 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={`sticky top-0 z-50 border-b transition-all duration-300 ${
       darkMode
-        ? 'bg-slate-900/95 border-slate-700 backdrop-blur-md'
-        : 'bg-white/95 border-blue-100 backdrop-blur-md shadow-sm'
+        ? 'bg-slate-950/85 border-slate-800 backdrop-blur-xl'
+        : 'bg-white/80 border-blue-100 backdrop-blur-xl shadow-sm'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-lg shadow-blue-900/30">
                 <Scale className="w-5 h-5 text-white" />
               </div>
               <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
                 NyayaSathi
               </h1>
               <p className={`text-xs font-medium ${darkMode ? 'text-blue-300' : 'text-blue-500'}`}>
-                Legal Information Assistant
+                Legal Information, Reimagined
               </p>
             </div>
           </div>
@@ -59,10 +59,10 @@ export const Header: React.FC<HeaderProps> = ({
               <select
                 value={selectedState}
                 onChange={(e) => setSelectedState(e.target.value)}
-                className={`text-sm pl-3 pr-8 py-2 rounded-lg border font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                className={`text-sm pl-3 pr-8 py-2 rounded-xl border font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                   darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white'
-                    : 'bg-blue-50 border-blue-200 text-blue-800'
+                    ? 'bg-slate-900/80 border-slate-700 text-white'
+                    : 'bg-blue-50/80 border-blue-200 text-blue-800'
                 }`}
               >
                 <option value="">🗺️ All India</option>
@@ -77,11 +77,11 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Language Toggle */}
             <button
               onClick={() => setLanguage(language === 'english' ? 'hinglish' : 'english')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all hover:scale-105 ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all hover:scale-105 ${
                 language === 'hinglish'
                   ? 'bg-orange-500 border-orange-400 text-white shadow-md'
                   : darkMode
-                  ? 'bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700'
+                  ? 'bg-slate-900/80 border-slate-700 text-slate-200 hover:bg-slate-800'
                   : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50'
               }`}
             >
@@ -93,11 +93,11 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => setLargeFontMode(!largeFontMode)}
               title="Toggle large font"
-              className={`p-2 rounded-lg border transition-all hover:scale-105 ${
+              className={`p-2 rounded-xl border transition-all hover:scale-105 ${
                 largeFontMode
                   ? 'bg-blue-600 border-blue-500 text-white'
                   : darkMode
-                  ? 'bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700'
+                  ? 'bg-slate-900/80 border-slate-700 text-slate-200 hover:bg-slate-800'
                   : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50'
               }`}
             >
@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => setDarkMode(!darkMode)}
               title="Toggle dark mode"
-              className={`p-2 rounded-lg border transition-all hover:scale-105 ${
+              className={`p-2 rounded-xl border transition-all hover:scale-105 ${
                 darkMode
                   ? 'bg-yellow-500 border-yellow-400 text-slate-900 hover:bg-yellow-400'
                   : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50'
@@ -121,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`md:hidden p-2 rounded-lg ${darkMode ? 'text-white' : 'text-blue-800'}`}
+            className={`md:hidden p-2 rounded-xl ${darkMode ? 'text-white bg-slate-900/70' : 'text-blue-800 bg-blue-50'}`}
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -129,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className={`md:hidden pb-4 pt-2 space-y-3 border-t mt-2 ${darkMode ? 'border-slate-700' : 'border-blue-100'}`}>
+          <div className={`md:hidden pb-4 pt-2 space-y-3 border-t mt-2 animate-fadeIn ${darkMode ? 'border-slate-700' : 'border-blue-100'}`}>
             <select
               value={selectedState}
               onChange={(e) => { setSelectedState(e.target.value); setMobileMenuOpen(false); }}

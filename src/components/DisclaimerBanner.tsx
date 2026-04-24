@@ -12,27 +12,39 @@ export const DisclaimerBanner: React.FC<DisclaimerBannerProps> = ({ darkMode }) 
   if (dismissed) return null;
 
   return (
-    <div className={`border-b transition-all duration-300 ${
-      darkMode
-        ? 'bg-amber-900/30 border-amber-700/50'
-        : 'bg-amber-50 border-amber-200'
-    }`}>
+    <div
+      className={`border-b transition-all duration-300 ${
+        darkMode ? 'bg-amber-900/30 border-amber-700/50' : 'bg-amber-50 border-amber-200'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
         <div className="flex items-start gap-3">
-          <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+          <AlertTriangle
+            className={`w-5 h-5 flex-shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-sm font-semibold ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
-                ⚠️ Important Disclaimer
+                Important Disclaimer
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                darkMode ? 'bg-amber-800/50 text-amber-300' : 'bg-amber-200 text-amber-800'
-              }`}>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  darkMode ? 'bg-amber-800/50 text-amber-300' : 'bg-amber-200 text-amber-800'
+                }`}
+              >
                 Not Legal Advice
+              </span>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  darkMode ? 'bg-red-900/40 text-red-300' : 'bg-red-100 text-red-700'
+                }`}
+              >
+                Verify Law Sections
               </span>
             </div>
             <p className={`text-sm mt-1 ${darkMode ? 'text-amber-200/80' : 'text-amber-700'}`}>
-              NyayaSathi provides general legal <strong>information</strong> only — not legal advice.
+              NyayaSathi provides general legal <strong>information</strong> only, not legal advice. Local AI models may make
+              mistakes in legal citations, so verify sections before relying on them.
               {!expanded && (
                 <button
                   onClick={() => setExpanded(true)}
@@ -45,6 +57,7 @@ export const DisclaimerBanner: React.FC<DisclaimerBannerProps> = ({ darkMode }) 
             {expanded && (
               <div className={`mt-2 text-sm space-y-1 ${darkMode ? 'text-amber-200/70' : 'text-amber-700'}`}>
                 <p>• Every legal situation is unique. This tool cannot account for your specific facts, documents, or circumstances.</p>
+                <p>• Local AI answers may still misstate or misnumber statutes. Always verify cited sections on official sources such as <strong>India Code</strong> before relying on them.</p>
                 <p>• For free legal aid, contact your nearest <strong>District Legal Services Authority (DLSA)</strong> or call <strong>NALSA Helpline: 15100</strong>.</p>
                 <p>• For Tele-Law services (free): Call <strong>15100</strong> or visit <a href="https://tele-law.in" target="_blank" rel="noopener noreferrer" className="underline">tele-law.in</a>.</p>
                 <p>• NyayaSathi is an information tool. Always consult a licensed advocate for your specific legal matter.</p>

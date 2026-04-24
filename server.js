@@ -1,12 +1,33 @@
-// Local development server that proxies API calls to Ollama
-// This lets us test locally without vercel/serverless complexity
+// Local development server that uses the proper handler for API calls
+// This ensures consistency between dev and production
 
 import http from 'http';
-import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { generateGeminiResponse } from './api/gemini-handler.js';
 
-const SYSTEM_PROMPT = `You answer legal questions about Indian law. Be brief. Cite laws.`;
+// Basic environment variable loader for local development
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.resolve(__dirname, '.env.local');
+if (fs.existsSync(envPath)) {
+  const envConfig = fs.readFileSync(envPath, 'utf8');
+  envConfig.split(/\r?\n/).forEach(line => {
+    const trimmedLine = line.trim();
+    if (trimmedLine && !trimmedLine.startsWith('#')) {
+      const [key, ...valueParts] = trimmedLine.split('=');
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+        process.env[key.trim()] = value;
+      }
+    }
+  });
+  console.log('✅ Environment variables loaded from .env.local');
+} else {
+  console.log('⚠️  .env.local not found, using system environment variables');
+}
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -26,118 +47,33 @@ const server = http.createServer((req, res) => {
       body += chunk.toString();
     });
 
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
-        const data = JSON.parse(body);
-        const { userMessage, chatHistory, language, selectedState } = data;
-
-        if (!userMessage) {
+        if (!body) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'userMessage is required' }));
+          res.end(JSON.stringify({ error: 'Empty request body' }));
           return;
         }
 
-        // Build prompt that forces direct answer
-        let prompt = `You are a legal assistant. Answer the question directly with Indian law references.\n\nQ: ${userMessage}\n\nA:`;
+        let data;
+        try {
+          data = JSON.parse(body);
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+          return;
+        }
 
-        console.log('📤 Calling Ollama API...');
-
-        // Call Ollama using http.request
-        const ollamaData = JSON.stringify({
-          model: 'tinyllama',
-          prompt: prompt,
-          stream: false,
-          temperature: 0.1,
-        });
-
-        const options = {
-          hostname: 'localhost',
-          port: 11434,
-          path: '/api/generate',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(ollamaData),
-          },
-        };
-
-        const ollamaReq = http.request(options, (ollamaRes) => {
-          let responseData = '';
-
-          ollamaRes.on('data', chunk => {
-            responseData += chunk;
-          });
-
-          ollamaRes.on('end', () => {
-            try {
-              if (ollamaRes.statusCode !== 200) {
-                throw new Error(`Ollama HTTP ${ollamaRes.statusCode}`);
-              }
-
-              const ollamaJson = JSON.parse(responseData);
-              let responseText = ollamaJson.response?.trim() || 'No response from Ollama';
-              
-              // Detect if tinyllama just generated a new question instead of an answer
-              // (This is a hallucination pattern where it repeats/invents questions)
-              const hasNewQuestion = /^[^.!?]*\?[^.!?]*\n/.test(responseText) || 
-                                     /^User:\s+\w/.test(responseText) ||
-                                     /^Question:\s+/.test(responseText);
-              
-              if (hasNewQuestion && !userMessage.includes('?')) {
-                // User didn't ask a question, but response started with one - likely hallucination
-                responseText = 'Unable to generate reliable response. Please try rephrasing your question.';
-              } else {
-                // Clean up response: remove various labels that tinyllama might add at start of lines
-                responseText = responseText
-                  .split('\n')
-                  .map(line => {
-                    // Remove question, response, user, assistant, answer labels from line start
-                    return line
-                      .replace(/^(Question|Response|User|Assistant|Answer):\s*/i, '')
-                      .replace(/^(Question|Response):\s*"[^"]*"\s*/i, '');
-                  })
-                  .join('\n')
-                  .replace(/^\n+/, '') // Remove leading newlines
-                  .trim();
-              }
-              
-              console.log(`✅ Ollama response received (${responseText.length} chars)`);
-              console.log(`📝 Response preview: ${responseText.substring(0, 100)}...`);
-
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({
-                success: true,
-                response: responseText,
-              }));
-            } catch (error) {
-              console.error('❌ Error parsing Ollama response:', error.message);
-              res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({
-                error: 'Failed to parse Ollama response',
-                details: error.message,
-              }));
-            }
-          });
-        });
-
-        ollamaReq.on('error', (error) => {
-          console.error('❌ Ollama connection error:', error.message);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            error: 'Failed to connect to Ollama',
-            details: error.message,
-            hint: 'Make sure Ollama is running: ollama serve',
-          }));
-        });
-
-        ollamaReq.write(ollamaData);
-        ollamaReq.end();
+        const result = await generateGeminiResponse(data);
+        
+        res.writeHead(result.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result.body));
       } catch (error) {
         console.error('❌ API Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           error: 'Failed to process request',
-          details: error.message,
+          details: error instanceof Error ? error.message : String(error),
         }));
       }
     });
@@ -153,8 +89,9 @@ const PORT = 3000;
 server.listen(PORT, () => {
   console.log(`\n✅ Development server running on http://localhost:${PORT}`);
   console.log(`Frontend: http://localhost:5173`);
-  console.log(`API proxy: http://localhost:${PORT}/api/gemini`);
-  console.log(`\n⚠️  Make sure you have running in separate terminals:`);
-  console.log(`   1. Ollama: ollama serve`);
+  console.log(`API endpoint: http://localhost:${PORT}/api/gemini`);
+  console.log(`\n⚠️  Make sure to run in separate terminals:`);
+  console.log(`   1. Ollama: Run "ollama serve" in a terminal`);
   console.log(`   2. Frontend: npm run dev (in another terminal)\n`);
+  console.log(`Provider: FORCED TO OLLAMA (Local AI)\n`);
 });

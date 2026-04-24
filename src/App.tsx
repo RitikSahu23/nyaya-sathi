@@ -133,11 +133,16 @@ export default function App() {
 
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
 
-      setError(errMsg.includes('quota')
-        ? 'Rate limit reached. Please wait a moment and try again.'
-        : errMsg.includes('unavailable')
-        ? 'The service is temporarily unavailable. Please try again in a moment.'
-        : 'Something went wrong. Please try again in a moment.'
+      setError(
+        errMsg.includes('Rate limit exceeded')
+          ? errMsg // Show the detailed rate limit message
+          : errMsg.includes('quota')
+          ? 'Rate limit reached. Please wait a moment and try again.'
+          : errMsg.includes('unavailable')
+          ? 'The service is temporarily unavailable. Please try again in a moment.'
+          : errMsg.includes('Cannot connect')
+          ? 'Cannot connect to backend. Check your internet or API key.'
+          : 'Something went wrong. Please try again.'
       );
 
       // Remove empty assistant message
@@ -170,6 +175,13 @@ export default function App() {
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${
       darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'
     } ${largeFontMode ? 'text-base' : ''}`}>
+      <div
+        className={`pointer-events-none fixed inset-0 -z-10 ${
+          darkMode
+            ? 'bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.08),transparent_26%)]'
+            : 'bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.12),transparent_24%),linear-gradient(180deg,#f8fbff,#eef4ff)]'
+        }`}
+      />
 
       {/* Header */}
       <Header
@@ -207,10 +219,12 @@ export default function App() {
           {/* Chat Toolbar */}
           {!showHero && (
             <div className={`flex items-center justify-between px-4 py-2.5 border-b ${
-              darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-blue-100'
+              darkMode ? 'bg-slate-950/70 border-slate-800 backdrop-blur-md' : 'bg-white/80 border-blue-100 backdrop-blur-md'
             }`}>
               <div className="flex items-center gap-2">
-                <Scale className={`w-4 h-4 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                <div className={`w-8 h-8 rounded-2xl flex items-center justify-center ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
+                  <Scale className="w-4 h-4" />
+                </div>
                 <span className={`text-sm font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                   NyayaSathi Chat
                 </span>
@@ -276,8 +290,8 @@ export default function App() {
 
                 {/* Welcome message if no messages yet */}
                 {messages.length === 0 && !isLoading && (
-                  <div className={`text-center py-8 ${baseFontClass}`}>
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center mx-auto mb-4 shadow-xl">
+                  <div className={`text-center py-8 animate-fadeIn ${baseFontClass}`}>
+                    <div className="w-16 h-16 rounded-[22px] bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-900/20 animate-floatDrift">
                       <Scale className="w-8 h-8 text-white" />
                     </div>
                     <h2 className={`text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-blue-900'}`}>
