@@ -142,6 +142,10 @@ export default function App() {
           ? 'The service is temporarily unavailable. Please try again in a moment.'
           : errMsg.includes('Cannot connect')
           ? 'Cannot connect to backend. Check your internet or API key.'
+          : errMsg.includes('Gemini API failed')
+          ? 'Gemini API failed, trying local Ollama model... Please wait.'
+          : errMsg.includes('No Gemini API key')
+          ? 'Using local Ollama model (no Gemini API key configured).'
           : 'Something went wrong. Please try again.'
       );
 

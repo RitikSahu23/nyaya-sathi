@@ -472,29 +472,39 @@ export async function generateGeminiResponse(payload, options = {}) {
     options.ollamaModel ||
     process.env.OLLAMA_MODEL ||
     'qwen2.5:3b';
-  
-  // Use Gemini for Vercel deployment, Ollama for local development
-  const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
-  const provider = isVercel ? 'gemini' : 'ollama';
 
   const finalMessage = buildUserMessage({ userMessage, language, selectedState });
   const references = retrieveLegalReferences(userMessage, selectedState);
 
-  if (provider === 'gemini') {
-    return generateGoogleResponse({
+  // Try Gemini API first if API key is available
+  if (apiKey) {
+    console.log('Attempting Gemini API...');
+    const geminiResult = await generateGoogleResponse({
       finalMessage,
       chatHistory,
       apiKey,
       model: 'gemini-2.0-flash-exp',
       references,
     });
+
+    // If Gemini succeeds, return the result
+    if (geminiResult.status === 200) {
+      return geminiResult;
+    }
+
+    // If Gemini fails, log the error and fallback to Ollama
+    console.log('Gemini API failed, falling back to Ollama:', geminiResult.body?.details || geminiResult.body?.error);
   } else {
-    return generateOllamaResponse({
-      finalMessage,
-      chatHistory,
-      ollamaUrl,
-      ollamaModel,
-      references,
-    });
+    console.log('No Gemini API key found, using Ollama');
   }
+
+  // Fallback to Ollama
+  console.log('Using Ollama as fallback...');
+  return generateOllamaResponse({
+    finalMessage,
+    chatHistory,
+    ollamaUrl,
+    ollamaModel,
+    references,
+  });
 }
